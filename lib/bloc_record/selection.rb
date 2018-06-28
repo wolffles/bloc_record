@@ -135,11 +135,11 @@ module Selection
     if args.count > 1
       args.map!{|x|
         case x
-          when Hash
-            "#{x.keys[0].to_s} #{x.values[0].to_s.upcase}"
-          else
-            x.to_s
-          end
+        when Hash
+          "#{x.keys[0].to_s} #{x.values[0].to_s.upcase}"
+        else
+          x.to_s
+        end
       }
 
     rows = connection.execute <<-SQL
@@ -165,6 +165,14 @@ module Selection
         rows = connection.execute <<-SQL
           SELECT * FROM #{table}
           INNER JOIN #{args.first} ON #{args.first}.#{table}_id = #{table}.id
+        SQL
+      when Hash
+        key = args.first[0].to_s
+        value = args.values[0].to_s
+        rows = connection.execute <<-SQL
+          SELECT * FROM #{table}
+          INNER JOIN #{key} ON #{key}.#{table}_id = #{table}.id
+          INNER JOIN #{value} ON #{value}.#{key}_id = #{key}.id
         SQL
       end
     end
