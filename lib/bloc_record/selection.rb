@@ -109,7 +109,71 @@ module Selection
     rows_to_array(rows)
   end
 
+  def where(*args)
+    if args.count > 1
+      expression = args.shift
+      params = args
+    else
+      case args.first
+      when String
+        expression = args.first
+      end
+    when Hash
+      expression_hash = BlocRecord::Utility.convert_keys(args.first)
+      expression = expression_hash.map{|key, value| "#{key}=#{BlocRecord:Utility.sql_strings(value)}"}.join(" and ")
+    end
+    sql = <<-SQL
+      SELECT#{columns.join ","} FROM #{table}
+      WHERE #{expression};
+    SQL
+
+    rows = connection.execute(sql,params)
+    rows_to_arrays(rows)
+  end
+
+  def order(*args)
+    if args.count > 1
+      args.map!{|x|
+        case x
+          when Hash
+            "#{x.keys[0].to_s} #{x.values[0].to_s.upcase}"
+          else
+            x.to_s
+          end
+      }
+
+    rows = connection.execute <<-SQL
+      SELECT * FROM #{table}
+      ORDER BY #{order};
+    SQL
+    rows_to_array(rows)
+  end
+
+  def join(*args)
+    if args.count > 1
+      joins = args.map { |arg| "INNER JOIN #{arg} ON #{arg}.#{table}_id = #{table}.id"}.join(" ")
+      rows = connection.execute <<-SQL
+        SELECT * FROM #{table} #{joins}
+      SQL
+    else
+      case args.first
+      when String
+        rows = connection.execute <<-SQL
+          SELECT * FROM #{table} #{BlocRecord::Utility.sql_strings(args.first)};
+        SQL
+      when Symbol
+        rows = connection.execute <<-SQL
+          SELECT * FROM #{table}
+          INNER JOIN #{args.first} ON #{args.first}.#{table}_id = #{table}.id
+        SQL
+      end
+    end
+
+    rows_to_array(rows)
+  end
+
   private
+
   def input_validation(input,type)
     case type
     when 'string'
