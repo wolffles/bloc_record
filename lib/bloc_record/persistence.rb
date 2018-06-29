@@ -28,11 +28,35 @@ module Persistence
     true
   end
 
-  def self.included(base)
+   def self.included(base)
      base.extend(ClassMethods)
    end
 
+   def update_attribute(attribute, value)
+     self.class.update(self.id, {attribute => value})
+   end
+
+   def update_attributes(updates)
+     self.class.update(self.id, updates)
+   end
+
    module ClassMethods
+     def method_missing(method_name, *args, &block)
+       if method_name.to_s =~ /^update_(.+)$/
+         update($1.to_sym, args.join)
+       else
+         super(method_name, *args, &block)
+       end
+     end
+
+     def self.respond_to?(method_sym, include_private = false)
+      if method_sym.to_s =~ /^update_(.+)$/
+        true
+      else
+        super
+      end
+    end
+
      def create(attrs)
        attrs = BlocRecord::Utility.convert_keys(attrs)
        attrs.delete "id"
@@ -47,5 +71,42 @@ module Persistence
        data["id"] = connection.execute("SELECT last_insert_rowid();")[0][0]
        new(data)
      end
-   end
+
+     def update_each(ids, updates)
+       updates = BlocRecord::Utility.convert_keys(updates)
+       updates.delete "id"
+       updates_array = updates.map{|key, value| "#{key}=#{BlocRecord::Utility.sql_strings(value)}"}
+
+      if ids.class == Fixnum
+        where_clause = "WHERE id = #{ids};"
+      elsif ids.class == Array
+        where_clause = ids.empty? ? ";" : "WHERE id IN (#{ids.join(",")});"
+      else
+        where_clause = ";"
+      end
+
+      connection.execute <<-SQL
+        UPDATE #{table}
+        SET #{updates_array + ","} #{where_clause}
+      SQL
+
+      true
+    end
+
+    def update(ids, updates)
+      if updates.is_a? Array
+        count = 0
+        while count < ids.length
+          each_update(ids[count], updates[count])
+          count += 1
+        end
+      else
+        each_update(ids, updates)
+      end
+    end
+
+    def update_all(updates)
+      update(nil, updates)
+    end
+  end
 end
