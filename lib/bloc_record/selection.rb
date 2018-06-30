@@ -117,18 +117,19 @@ module Selection
       case args.first
       when String
         expression = args.first
+      when Hash
+        expression_hash = BlocRecord::Utility.convert_keys(args.first)
+        expression = expression_hash.map{|key, value| "#{key}=#{BlocRecord::Utility.sql_strings(value)}"}.join(" and ")
       end
-    when Hash
-      expression_hash = BlocRecord::Utility.convert_keys(args.first)
-      expression = expression_hash.map{|key, value| "#{key}=#{BlocRecord:Utility.sql_strings(value)}"}.join(" and ")
     end
+
     sql = <<-SQL
-      SELECT#{columns.join ","} FROM #{table}
+      SELECT #{columns.join ","} FROM #{table}
       WHERE #{expression};
     SQL
 
     rows = connection.execute(sql,params)
-    rows_to_arrays(rows)
+    rows_to_array(rows)
   end
 
   def order(*args)
@@ -141,7 +142,7 @@ module Selection
           x.to_s
         end
       }
-
+    end
     rows = connection.execute <<-SQL
       SELECT * FROM #{table}
       ORDER BY #{order};
