@@ -18,6 +18,7 @@ module BlocRecord
     end
 
     def destroy_all
-     self.any? ? self.destroy : false 
+     self.any? ? self.destroy : false
+   end
   end
 end
